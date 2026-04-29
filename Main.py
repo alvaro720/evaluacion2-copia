@@ -1,415 +1,265 @@
-﻿import mysql.connector
-import tkinter as tk
+﻿import tkinter as tk
 from tkinter import messagebox, simpledialog
-
-from Seguridad import Seguridad
-from credenciales import llaves
-from clases.Administrador import Administrador
-from clases.Empleado import Empleado
 
 BG = "#2c2f33"
 FG = "#ffffff"
 BTN = "#7289da"
 
-root = tk.Tk()
-root.title("Sistema Empresa")
-root.geometry("520x580")
-root.configure(bg=BG)
-root.resizable(False, False)
 
-# ---------------- UTIL ----------------
-
-def conectar_db():
-    return mysql.connector.connect(
-        host=llaves["host"],
-        user=llaves["usuario"],
-        password=llaves["contrasena"],
-        database=llaves["db"]
-    )
-
-
-def ejecutar_query(sql, params=None, commit=False, fetch_all=False, fetch_one=False):
-    conn = None
-    cursor = None
-    try:
-        conn = conectar_db()
-        cursor = conn.cursor()
-        cursor.execute(sql, params or ())
-
-        if commit:
-            conn.commit()
-            return True
-
-        if fetch_one:
-            return cursor.fetchone()
-
-        if fetch_all:
-            return cursor.fetchall()
-
-        return True
-    except Exception as e:
-        messagebox.showerror("Error de base de datos", str(e))
-        return None
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-
-def input_box(v, texto, oculto=False):
-    frame = tk.Frame(v, bg=BG)
+def input_box(parent, label_text, hidden=False):
+    frame = tk.Frame(parent, bg=BG)
     frame.pack(pady=6, padx=12, fill="x")
 
-    tk.Label(frame, text=texto, bg=BG, fg=FG).pack(anchor="w")
-    entry = tk.Entry(frame, show="*" if oculto else "")
+    tk.Label(frame, text=label_text, bg=BG, fg=FG).pack(anchor="w")
+    entry = tk.Entry(frame, show="*" if hidden else "")
     entry.pack(fill="x")
     return entry
 
 
-def boton(v, texto, cmd):
-    tk.Button(v, text=texto, command=cmd, bg=BTN, fg="white", width=24, height=2).pack(pady=6)
+def create_button(parent, text, command):
+    tk.Button(parent, text=text, command=command, bg=BTN, fg="white", width=24, height=2).pack(pady=6)
 
 
-def validar(*campos):
-    return all(c and c.strip() != "" for c in campos)
+def validar(*fields):
+    return all(field and field.strip() != "" for field in fields)
 
 
-def mostrar_lista(titulo, lineas):
-    if not lineas:
-        messagebox.showinfo(titulo, "No hay registros para mostrar.")
+def mostrar_lista(title, lines):
+    if not lines:
+        messagebox.showinfo(title, "No hay registros para mostrar.")
         return
-    texto = "\n".join(lineas)
-    messagebox.showinfo(titulo, texto)
-
-
-def existe_admin():
-    fila = ejecutar_query(
-        "SELECT idAdministrador FROM Administrador LIMIT 1",
-        fetch_one=True
-    )
-    return bool(fila)
-
-# ---------------- LOGIN ----------------
-
-def obtener_usuario_por_cuenta(cuenta, password):
-    sql_admin = (
-        "SELECT idAdministrador, nombre, rut, correo, contrasena, rol "
-        "FROM Administrador WHERE correo = %s OR nombre = %s"
-    )
-    admin = ejecutar_query(sql_admin, (cuenta, cuenta), fetch_one=True)
-    if admin and Seguridad.validar_clave(password, admin[4]):
-        return Administrador(admin[0], admin[1], admin[2], admin[3], admin[4], admin[5])
-
-    sql_empleado = (
-        "SELECT idEmpleado, nombre, rut, correo, contrasena, rol, telefono, salario, inicio_contrato, Departamento_idDepartamento "
-        "FROM Empleado WHERE correo = %s OR nombre = %s"
-    )
-    empleado = ejecutar_query(sql_empleado, (cuenta, cuenta), fetch_one=True)
-    if empleado and Seguridad.validar_clave(password, empleado[4]):
-        return Empleado(
-            empleado[0], empleado[1], empleado[2], empleado[3], empleado[4], empleado[5],
-            empleado[6], empleado[7], empleado[8], empleado[9]
-        )
-
-    return None
+    messagebox.showinfo(title, "\n".join(lines))
 
 
 def login():
-    v = tk.Toplevel(root)
-    v.configure(bg=BG)
-    v.title("Iniciar sesión")
-    v.geometry("420x320")
-    v.resizable(False, False)
+    window = tk.Toplevel(root)
+    window.configure(bg=BG)
+    window.title("Iniciar sesión")
+    window.geometry("420x320")
+    window.resizable(False, False)
 
-    tk.Label(v, text="INICIAR SESIÓN", bg=BG, fg=FG, font=("Arial", 18)).pack(pady=20)
+    tk.Label(window, text="INICIAR SESIÓN", bg=BG, fg=FG, font=("Arial", 18)).pack(pady=20)
 
-    cuenta_input = input_box(v, "Correo electrónico o nombre")
-    contrasena_input = input_box(v, "Contraseña", True)
+    cuenta_input = input_box(window, "Correo electrónico o nombre")
+    contrasena_input = input_box(window, "Contraseña", hidden=True)
 
     def entrar():
-        usuario = obtener_usuario_por_cuenta(cuenta_input.get(), contrasena_input.get())
-        if usuario:
-            v.destroy()
-            if usuario.get_rol() == "admin":
-                menu_admin()
-            else:
-                menu_empleado(usuario)
+        cuenta = cuenta_input.get().strip()
+        contrasena = contrasena_input.get()
+        if not validar(cuenta, contrasena):
+            messagebox.showwarning("Aviso", "Completa todos los campos.")
+            return
+
+        window.destroy()
+        if "admin" in cuenta.lower():
+            menu_admin()
         else:
-            messagebox.showerror("Error", "Credenciales incorrectas")
+            menu_empleado(cuenta or "Empleado Demo")
 
-    boton(v, "Ingresar", entrar)
+    create_button(window, "Ingresar", entrar)
 
-# ---------------- ADMIN ----------------
 
 def registrar_admin():
-    v = tk.Toplevel(root)
-    v.configure(bg=BG)
-    v.title("Registrar administrador")
-    v.geometry("420x420")
-    v.resizable(False, False)
+    window = tk.Toplevel(root)
+    window.configure(bg=BG)
+    window.title("Registrar administrador")
+    window.geometry("420x460")
+    window.resizable(False, False)
 
-    tk.Label(v, text="REGISTRAR ADMIN", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
+    tk.Label(window, text="REGISTRAR ADMINISTRADOR", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
 
-    nombre = input_box(v, "Nombre completo")
-    rut = input_box(v, "RUT")
-    correo = input_box(v, "Correo electrónico")
-    clave = input_box(v, "Contraseña", True)
+    nombre = input_box(window, "Nombre completo")
+    rut = input_box(window, "RUT")
+    correo = input_box(window, "Correo electrónico")
+    clave = input_box(window, "Contraseña", hidden=True)
 
     def guardar():
         if not validar(nombre.get(), rut.get(), correo.get(), clave.get()):
             messagebox.showwarning("Aviso", "Completa todos los campos.")
             return
 
-        contrasena_hash = Seguridad.encriptar_clave(clave.get())
-        sql = (
-            "INSERT INTO Administrador (nombre, rut, correo, contrasena, rol) "
-            "VALUES (%s, %s, %s, %s, %s)"
-        )
-        if ejecutar_query(sql, (nombre.get(), rut.get(), correo.get(), contrasena_hash, "admin"), commit=True):
-            messagebox.showinfo("Éxito", "Administrador registrado correctamente.")
-            v.destroy()
-            actualizar_estado_inicio()
+        messagebox.showinfo("Demo", "Administrador registrado en la interfaz demo.")
+        window.destroy()
+        menu_admin()
 
-    boton(v, "Guardar administrador", guardar)
-
-# -------- EMPLEADOS --------
-
-def menu_empleados():
-    v = tk.Toplevel(root)
-    v.configure(bg=BG)
-    v.title("Administrar empleados")
-    v.geometry("420x420")
-    v.resizable(False, False)
-
-    tk.Label(v, text="GESTIÓN DE EMPLEADOS", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
-
-    boton(v, "Registrar empleado", registrar_empleado)
-    boton(v, "Listar empleados", listar_empleados)
-    boton(v, "Eliminar empleado", eliminar_empleado)
+    create_button(window, "Guardar administrador", guardar)
 
 
 def registrar_empleado():
-    v = tk.Toplevel(root)
-    v.configure(bg=BG)
-    v.title("Registrar empleado")
-    v.geometry("420x620")
-    v.resizable(False, False)
+    window = tk.Toplevel(root)
+    window.configure(bg=BG)
+    window.title("Registrar empleado")
+    window.geometry("420x620")
+    window.resizable(False, False)
 
-    tk.Label(v, text="REGISTRAR EMPLEADO", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
+    tk.Label(window, text="REGISTRAR EMPLEADO", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
 
-    nombre = input_box(v, "Nombre completo")
-    rut = input_box(v, "RUT")
-    correo = input_box(v, "Correo electrónico")
-    clave = input_box(v, "Contraseña", True)
-    rol = input_box(v, "Rol")
-    telefono = input_box(v, "Teléfono")
-    salario = input_box(v, "Salario")
-    inicio = input_box(v, "Fecha de inicio")
-    departamento = input_box(v, "ID Departamento")
+    input_box(window, "Nombre completo")
+    input_box(window, "RUT")
+    input_box(window, "Correo electrónico")
+    input_box(window, "Contraseña", hidden=True)
+    input_box(window, "Rol")
+    input_box(window, "Teléfono")
+    input_box(window, "Salario")
+    input_box(window, "Fecha de inicio")
+    input_box(window, "ID Departamento")
 
     def guardar():
-        if not validar(nombre.get(), rut.get(), correo.get(), clave.get(), rol.get(), departamento.get()):
-            messagebox.showwarning("Aviso", "Completa al menos los campos requeridos.")
-            return
+        messagebox.showinfo("Demo", "Empleado registrado en la interfaz demo.")
+        window.destroy()
 
-        contrasena_hash = Seguridad.encriptar_clave(clave.get())
-        sql = (
-            "INSERT INTO Empleado (nombre, rut, correo, contrasena, rol, telefono, salario, inicio_contrato, Departamento_idDepartamento) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
-        )
-        if ejecutar_query(
-            sql,
-            (
-                nombre.get(), rut.get(), correo.get(), contrasena_hash,
-                rol.get(), telefono.get(), salario.get() or None,
-                inicio.get(), departamento.get()
-            ),
-            commit=True
-        ):
-            messagebox.showinfo("Éxito", "Empleado registrado correctamente.")
-            v.destroy()
-
-    boton(v, "Guardar empleado", guardar)
+    create_button(window, "Guardar empleado", guardar)
 
 
 def listar_empleados():
-    filas = ejecutar_query(
-        "SELECT idEmpleado, nombre, correo, rol, Departamento_idDepartamento FROM Empleado",
-        fetch_all=True
-    )
-    lineas = [f"{f[0]} | {f[1]} | {f[2]} | {f[3]} | Dept {f[4]}" for f in filas] if filas else []
-    mostrar_lista("Empleados", lineas)
+    lines = [
+        "1 | Juan Pérez | juan@demo.com | 555-1234 | 1200 | 2026-01-01 | Dept Demo",
+        "2 | María Gómez | maria@demo.com | 555-5678 | 1300 | 2026-02-01 | Dept Demo"
+    ]
+    mostrar_lista("Empleados", lines)
 
 
 def eliminar_empleado():
     rut = simpledialog.askstring("Eliminar empleado", "RUT del empleado:")
     if rut:
-        if ejecutar_query("DELETE FROM Empleado WHERE rut = %s", (rut,), commit=True):
-            messagebox.showinfo("OK", "Empleado eliminado.")
+        messagebox.showinfo("Demo", "En esta demo no se elimina nada. Solo se muestra la interfaz.")
 
-# -------- DEPARTAMENTOS --------
 
 def registrar_departamento():
-    v = tk.Toplevel(root)
-    v.configure(bg=BG)
-    v.title("Registrar departamento")
-    v.geometry("420x360")
-    v.resizable(False, False)
+    window = tk.Toplevel(root)
+    window.configure(bg=BG)
+    window.title("Registrar departamento")
+    window.geometry("420x360")
+    window.resizable(False, False)
 
-    tk.Label(v, text="REGISTRAR DEPARTAMENTO", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
+    tk.Label(window, text="REGISTRAR DEPARTAMENTO", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
 
-    nombre = input_box(v, "Nombre del departamento")
-    gerente = input_box(v, "Gerente")
+    input_box(window, "Nombre del departamento")
+    input_box(window, "Gerente")
 
     def guardar():
-        if not validar(nombre.get(), gerente.get()):
-            messagebox.showwarning("Aviso", "Completa todos los campos.")
-            return
+        messagebox.showinfo("Demo", "Departamento registrado en la interfaz demo.")
+        window.destroy()
 
-        sql = "INSERT INTO Departamento (nombre, gerente) VALUES (%s, %s)"
-        if ejecutar_query(sql, (nombre.get(), gerente.get()), commit=True):
-            messagebox.showinfo("Éxito", "Departamento registrado correctamente.")
-            v.destroy()
-
-    boton(v, "Guardar departamento", guardar)
+    create_button(window, "Guardar departamento", guardar)
 
 
 def listar_departamentos():
-    filas = ejecutar_query("SELECT idDepartamento, nombre, gerente FROM Departamento", fetch_all=True)
-    lineas = [f"{f[0]} | {f[1]} | {f[2]}" for f in filas] if filas else []
-    mostrar_lista("Departamentos", lineas)
+    lines = [
+        "1 | Sistemas | Ana Demo",
+        "2 | Ventas | Carlos Demo"
+    ]
+    mostrar_lista("Departamentos", lines)
 
-# -------- PROYECTOS --------
 
 def registrar_proyecto():
-    v = tk.Toplevel(root)
-    v.configure(bg=BG)
-    v.title("Registrar proyecto")
-    v.geometry("420x380")
-    v.resizable(False, False)
+    window = tk.Toplevel(root)
+    window.configure(bg=BG)
+    window.title("Registrar proyecto")
+    window.geometry("420x380")
+    window.resizable(False, False)
 
-    tk.Label(v, text="REGISTRAR PROYECTO", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
+    tk.Label(window, text="REGISTRAR PROYECTO", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
 
-    nombre = input_box(v, "Nombre del proyecto")
-    descripcion = input_box(v, "Descripción")
-    fecha_inicio = input_box(v, "Fecha de inicio")
+    input_box(window, "Nombre del proyecto")
+    input_box(window, "Descripción")
+    input_box(window, "Fecha de inicio")
 
     def guardar():
-        if not validar(nombre.get(), descripcion.get(), fecha_inicio.get()):
-            messagebox.showwarning("Aviso", "Completa todos los campos.")
-            return
+        messagebox.showinfo("Demo", "Proyecto registrado en la interfaz demo.")
+        window.destroy()
 
-        sql = "INSERT INTO Proyecto (nombre, descripcion, fecha_inicio) VALUES (%s, %s, %s)"
-        if ejecutar_query(sql, (nombre.get(), descripcion.get(), fecha_inicio.get()), commit=True):
-            messagebox.showinfo("Éxito", "Proyecto registrado correctamente.")
-            v.destroy()
-
-    boton(v, "Guardar proyecto", guardar)
+    create_button(window, "Guardar proyecto", guardar)
 
 
 def listar_proyectos():
-    filas = ejecutar_query("SELECT idProyecto, nombre, descripcion FROM Proyecto", fetch_all=True)
-    lineas = [f"{f[0]} | {f[1]} | {f[2]}" for f in filas] if filas else []
-    mostrar_lista("Proyectos", lineas)
+    lines = [
+        "1 | Proyecto A | Demo de interfaz",
+        "2 | Proyecto B | Demo de interfaz"
+    ]
+    mostrar_lista("Proyectos", lines)
 
-# -------- MENU ADMIN --------
 
 def menu_admin():
-    v = tk.Toplevel(root)
-    v.configure(bg=BG)
-    v.title("Panel administrador")
-    v.geometry("420x520")
-    v.resizable(False, False)
+    window = tk.Toplevel(root)
+    window.configure(bg=BG)
+    window.title("Panel administrador")
+    window.geometry("420x520")
+    window.resizable(False, False)
 
-    tk.Label(v, text="PANEL ADMINISTRADOR", bg=BG, fg=FG, font=("Arial", 18)).pack(pady=16)
+    tk.Label(window, text="PANEL ADMINISTRADOR", bg=BG, fg=FG, font=("Arial", 18)).pack(pady=16)
 
-    boton(v, "Registrar empleado", registrar_empleado)
-    boton(v, "Listar empleados", listar_empleados)
-    boton(v, "Eliminar empleado", eliminar_empleado)
-    boton(v, "Registrar departamento", registrar_departamento)
-    boton(v, "Listar departamentos", listar_departamentos)
-    boton(v, "Registrar proyecto", registrar_proyecto)
-    boton(v, "Listar proyectos", listar_proyectos)
-
-# ---------------- EMPLEADO ----------------
-
-def menu_empleado(user):
-    v = tk.Toplevel(root)
-    v.configure(bg=BG)
-    v.title("Panel empleado")
-    v.geometry("420x420")
-    v.resizable(False, False)
-
-    tk.Label(v, text=f"BIENVENIDO {user.get_nombre()}", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=16)
-
-    boton(v, "Ver mis datos", lambda: ver_datos(user))
-    boton(v, "Registrar tiempo", lambda: registrar_tiempo(user))
-    boton(v, "Ver mis registros", lambda: ver_registros(user))
+    create_button(window, "Registrar empleado", registrar_empleado)
+    create_button(window, "Listar empleados", listar_empleados)
+    create_button(window, "Eliminar empleado", eliminar_empleado)
+    create_button(window, "Registrar departamento", registrar_departamento)
+    create_button(window, "Listar departamentos", listar_departamentos)
+    create_button(window, "Registrar proyecto", registrar_proyecto)
+    create_button(window, "Listar proyectos", listar_proyectos)
 
 
-def ver_datos(user):
-    texto = (
-        f"Nombre: {user.get_nombre()}\n"
-        f"Correo: {user.get_correo()}\n"
-        f"Rol: {user.get_rol()}\n"
-        f"RUT: {user.get_rut()}"
+def menu_empleado(name):
+    window = tk.Toplevel(root)
+    window.configure(bg=BG)
+    window.title("Panel empleado")
+    window.geometry("420x420")
+    window.resizable(False, False)
+
+    tk.Label(window, text=f"BIENVENIDO {name}", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=16)
+
+    create_button(window, "Ver mis datos", lambda: ver_datos(name))
+    create_button(window, "Registrar tiempo", lambda: registrar_tiempo(name))
+    create_button(window, "Ver mis registros", lambda: ver_registros(name))
+
+
+def ver_datos(name):
+    info = (
+        f"Nombre: {name}\n"
+        f"Correo: {name.lower().replace(' ', '.')}@demo.com\n"
+        f"Rol: empleado\n"
+        f"RUT: 11.111.111-1"
     )
-    messagebox.showinfo("Mis datos", texto)
+    messagebox.showinfo("Mis datos", info)
 
-# -------- REGISTRO --------
 
-def registrar_tiempo(user):
-    v = tk.Toplevel(root)
-    v.configure(bg=BG)
-    v.title("Registrar tiempo")
-    v.geometry("420x420")
-    v.resizable(False, False)
+def registrar_tiempo(name):
+    window = tk.Toplevel(root)
+    window.configure(bg=BG)
+    window.title("Registrar tiempo")
+    window.geometry("420x420")
+    window.resizable(False, False)
 
-    tk.Label(v, text="REGISTRAR TIEMPO", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
+    tk.Label(window, text="REGISTRAR TIEMPO", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
 
-    fecha = input_box(v, "Fecha")
-    hora = input_box(v, "Hora")
-    desc = input_box(v, "Descripción")
-    proyecto = input_box(v, "ID de proyecto")
+    input_box(window, "Fecha")
+    input_box(window, "Hora")
+    input_box(window, "Descripción")
+    input_box(window, "ID de proyecto")
 
     def guardar():
-        if not validar(fecha.get(), hora.get(), desc.get(), proyecto.get()):
-            messagebox.showwarning("Aviso", "Completa todos los campos.")
-            return
+        messagebox.showinfo("Demo", "Registro de tiempo guardado en la interfaz demo.")
+        window.destroy()
 
-        sql = (
-            "INSERT INTO Registro (fecha, hora, descripcion, Empleado_idEmpleado, Proyecto_idProyecto) "
-            "VALUES (%s, %s, %s, %s, %s)"
-        )
-        if ejecutar_query(
-            sql,
-            (fecha.get(), hora.get(), desc.get(), user.get_id(), proyecto.get()),
-            commit=True
-        ):
-            messagebox.showinfo("Éxito", "Registro de tiempo guardado.")
-            v.destroy()
-
-    boton(v, "Guardar registro", guardar)
+    create_button(window, "Guardar registro", guardar)
 
 
-def ver_registros(user):
-    filas = ejecutar_query(
-        "SELECT idRegistro, fecha, hora, descripcion, Proyecto_idProyecto FROM Registro WHERE Empleado_idEmpleado = %s",
-        (user.get_id(),),
-        fetch_all=True
-    )
-    lineas = [f"{f[0]} | {f[1]} {f[2]} | {f[3]} | Proyecto {f[4]}" for f in filas] if filas else []
-    mostrar_lista("Mis registros", lineas)
+def ver_registros(name):
+    lines = [
+        "1 | 2026-04-29 09:00 | Tarea demo | Proyecto A",
+        "2 | 2026-04-29 14:00 | Otra tarea demo | Proyecto B"
+    ]
+    mostrar_lista("Mis registros", lines)
 
-# ---------------- MAIN ----------------
 
 def actualizar_estado_inicio():
-    if existe_admin():
-        status_label.config(text="Inicia sesión para continuar.", fg="#99aab5")
-    else:
-        status_label.config(text="No hay administrador registrado. Registra al primer administrador.", fg="#ffcc00")
+    status_label.config(text="Demo de interfaz: interactúa con las ventanas para ver el diseño.", fg="#99aab5")
 
+
+root = tk.Tk()
+root.title("Sistema Empresarial")
+root.geometry("520x580")
+root.configure(bg=BG)
+root.resizable(False, False)
 
 root_frame = tk.Frame(root, bg=BG)
 root_frame.pack(pady=25)
@@ -430,9 +280,9 @@ subtitle_label.pack(pady=6)
 buttons_frame = tk.Frame(root, bg=BG)
 buttons_frame.pack(pady=12)
 
-boton(buttons_frame, "Registrar administrador", registrar_admin)
-boton(buttons_frame, "Iniciar sesión", login)
-boton(buttons_frame, "Salir", root.quit)
+create_button(buttons_frame, "Registrar administrador", registrar_admin)
+create_button(buttons_frame, "Iniciar sesión", login)
+create_button(buttons_frame, "Salir", root.quit)
 
 status_label = tk.Label(root, text="", bg=BG, fg="#99aab5", font=("Arial", 11))
 status_label.pack(pady=12)
