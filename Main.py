@@ -1,23 +1,38 @@
 ﻿import tkinter as tk
 from tkinter import messagebox, simpledialog
 
-BG = "#2c2f33"
-FG = "#ffffff"
-BTN = "#7289da"
+ROOT_BG = "#e7eefc"
+CARD_BG = "#f9fbff"
+CARD_BORDER = "#d1dff1"
+TEXT_COLOR = "#1f2a4a"
+LABEL_COLOR = "#55607f"
+FIELD_BG = "#eef4ff"
+BTN_BG = "#5f7dff"
+BTN_ACTIVE = "#4561d1"
+SECONDARY_BG = "#e7efff"
 
 
-def input_box(parent, label_text, hidden=False):
-    frame = tk.Frame(parent, bg=BG)
-    frame.pack(pady=6, padx=12, fill="x")
-
-    tk.Label(frame, text=label_text, bg=BG, fg=FG).pack(anchor="w")
-    entry = tk.Entry(frame, show="*" if hidden else "")
-    entry.pack(fill="x")
-    return entry
+def create_form_label(parent, text):
+    return tk.Label(parent, text=text, bg=CARD_BG, fg=LABEL_COLOR, font=("Segoe UI", 10, "bold"))
 
 
-def create_button(parent, text, command):
-    tk.Button(parent, text=text, command=command, bg=BTN, fg="white", width=24, height=2).pack(pady=6)
+def create_input(parent, hidden=False):
+    frame = tk.Frame(parent, bg=CARD_BG)
+    frame.pack(fill="x", pady=8)
+
+    entry_frame = tk.Frame(frame, bg=FIELD_BG, bd=0)
+    entry_frame.pack(fill="x", padx=0)
+
+    entry = tk.Entry(entry_frame, bd=0, bg=FIELD_BG, fg=TEXT_COLOR, font=("Segoe UI", 11), show="*" if hidden else "")
+    entry.pack(fill="x", padx=12, pady=12)
+    return frame, entry
+
+
+def create_button(parent, text, command, width=28):
+    btn = tk.Button(parent, text=text, command=command, bg=BTN_BG, fg="white", activebackground=BTN_ACTIVE,
+                    bd=0, font=("Segoe UI", 11, "bold"), cursor="hand2")
+    btn.pack(pady=12, ipadx=6, ipady=6)
+    return btn
 
 
 def validar(*fields):
@@ -31,84 +46,130 @@ def mostrar_lista(title, lines):
     messagebox.showinfo(title, "\n".join(lines))
 
 
-def login():
-    window = tk.Toplevel(root)
-    window.configure(bg=BG)
-    window.title("Iniciar sesión")
-    window.geometry("420x320")
-    window.resizable(False, False)
+def login_action(email_entry, pass_entry):
+    cuenta = email_entry.get().strip()
+    contrasena = pass_entry.get()
+    if not validar(cuenta, contrasena):
+        messagebox.showwarning("Aviso", "Completa todos los campos.")
+        return
 
-    tk.Label(window, text="INICIAR SESIÓN", bg=BG, fg=FG, font=("Arial", 18)).pack(pady=20)
+    if "admin" in cuenta.lower():
+        menu_admin()
+    else:
+        menu_empleado(cuenta or "Empleado Demo")
 
-    cuenta_input = input_box(window, "Correo electrónico o nombre")
-    contrasena_input = input_box(window, "Contraseña", hidden=True)
 
-    def entrar():
-        cuenta = cuenta_input.get().strip()
-        contrasena = contrasena_input.get()
-        if not validar(cuenta, contrasena):
-            messagebox.showwarning("Aviso", "Completa todos los campos.")
-            return
+def build_login_screen():
+    card = tk.Frame(root, bg=CARD_BG, bd=1, relief="solid", highlightbackground=CARD_BORDER,
+                    highlightcolor=CARD_BORDER, highlightthickness=1)
+    card.place(relx=0.5, rely=0.5, anchor="center", width=460, height=520)
 
-        window.destroy()
-        if "admin" in cuenta.lower():
-            menu_admin()
+    tk.Label(card, text="INICIAR SESIÓN", bg=CARD_BG, fg=TEXT_COLOR, font=("Segoe UI", 20, "bold")).pack(pady=(28, 8))
+    tk.Label(card, text="Bienvenido de nuevo, ingresa tus datos para continuar.", bg=CARD_BG, fg=LABEL_COLOR,
+             font=("Segoe UI", 10), wraplength=380, justify="center").pack(pady=(0, 24))
+
+    form_frame = tk.Frame(card, bg=CARD_BG)
+    form_frame.pack(padx=28, fill="x")
+
+    tk.Label(form_frame, text="Correo electrónico", bg=CARD_BG, fg=LABEL_COLOR, font=("Segoe UI", 9, "bold")).pack(anchor="w")
+    email_frame = tk.Frame(form_frame, bg=FIELD_BG)
+    email_frame.pack(fill="x", pady=(6, 16))
+    email_entry = tk.Entry(email_frame, bd=0, bg=FIELD_BG, fg=TEXT_COLOR, font=("Segoe UI", 11))
+    email_entry.pack(fill="x", padx=12, pady=12)
+
+    tk.Label(form_frame, text="Contraseña", bg=CARD_BG, fg=LABEL_COLOR, font=("Segoe UI", 9, "bold")).pack(anchor="w")
+    pass_frame = tk.Frame(form_frame, bg=FIELD_BG)
+    pass_frame.pack(fill="x", pady=(6, 8))
+    pass_entry = tk.Entry(pass_frame, bd=0, bg=FIELD_BG, fg=TEXT_COLOR, font=("Segoe UI", 11), show="*")
+    pass_entry.pack(side="left", fill="x", expand=True, padx=(12, 0), pady=12)
+
+    def toggle_password():
+        if pass_entry.cget("show") == "":
+            pass_entry.config(show="*")
+            toggle_button.config(text="👁")
         else:
-            menu_empleado(cuenta or "Empleado Demo")
+            pass_entry.config(show="")
+            toggle_button.config(text="🙈")
 
-    create_button(window, "Ingresar", entrar)
+    toggle_button = tk.Button(pass_frame, text="👁", bg=FIELD_BG, fg=LABEL_COLOR, bd=0,
+                              font=("Segoe UI", 10), activebackground=FIELD_BG,
+                              command=toggle_password, cursor="hand2")
+    toggle_button.pack(side="right", padx=8)
+
+    create_button(card, "INGRESAR", lambda: login_action(email_entry, pass_entry))
+
+    footer = tk.Frame(card, bg=SECONDARY_BG, bd=0)
+    footer.pack(fill="x", pady=(24, 0), padx=18)
+    footer.configure(highlightthickness=0)
+
+    tk.Label(footer, text="No hay un administrador registrado.", bg=SECONDARY_BG, fg=TEXT_COLOR,
+             font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(16, 4))
+    tk.Label(footer, text="Registra el primer administrador para comenzar.", bg=SECONDARY_BG,
+             fg=LABEL_COLOR, font=("Segoe UI", 9), wraplength=360, justify="left").pack(anchor="w")
+    create_button(footer, "Registrar administrador", registrar_admin)
 
 
 def registrar_admin():
     window = tk.Toplevel(root)
-    window.configure(bg=BG)
+    window.configure(bg=ROOT_BG)
     window.title("Registrar administrador")
     window.geometry("420x460")
     window.resizable(False, False)
 
-    tk.Label(window, text="REGISTRAR ADMINISTRADOR", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
+    card = tk.Frame(window, bg=CARD_BG, bd=1, relief="solid", highlightbackground=CARD_BORDER,
+                    highlightcolor=CARD_BORDER, highlightthickness=1)
+    card.pack(fill="both", expand=True, padx=18, pady=18)
 
-    nombre = input_box(window, "Nombre completo")
-    rut = input_box(window, "RUT")
-    correo = input_box(window, "Correo electrónico")
-    clave = input_box(window, "Contraseña", hidden=True)
+    tk.Label(card, text="REGISTRAR ADMINISTRADOR", bg=CARD_BG, fg=TEXT_COLOR,
+             font=("Segoe UI", 16, "bold")).pack(pady=18)
+
+    fields = []
+    for label in ["Nombre completo", "RUT", "Correo electrónico", "Contraseña"]:
+        tk.Label(card, text=label, bg=CARD_BG, fg=LABEL_COLOR, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=18, pady=(10, 0))
+        entry_bg = tk.Frame(card, bg=FIELD_BG)
+        entry_bg.pack(fill="x", padx=18, pady=6)
+        entry = tk.Entry(entry_bg, bd=0, bg=FIELD_BG, fg=TEXT_COLOR, font=("Segoe UI", 11), show="*" if label == "Contraseña" else "")
+        entry.pack(fill="x", padx=12, pady=12)
+        fields.append(entry)
 
     def guardar():
-        if not validar(nombre.get(), rut.get(), correo.get(), clave.get()):
+        if not validar(*(field.get() for field in fields)):
             messagebox.showwarning("Aviso", "Completa todos los campos.")
             return
-
         messagebox.showinfo("Demo", "Administrador registrado en la interfaz demo.")
         window.destroy()
         menu_admin()
 
-    create_button(window, "Guardar administrador", guardar)
+    create_button(card, "Guardar administrador", guardar)
+    create_button(card, "INGRESAR", lambda: window.destroy())
 
 
 def registrar_empleado():
     window = tk.Toplevel(root)
-    window.configure(bg=BG)
+    window.configure(bg=ROOT_BG)
     window.title("Registrar empleado")
     window.geometry("420x620")
     window.resizable(False, False)
 
-    tk.Label(window, text="REGISTRAR EMPLEADO", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
+    card = tk.Frame(window, bg=CARD_BG, bd=1, relief="solid", highlightbackground=CARD_BORDER,
+                    highlightcolor=CARD_BORDER, highlightthickness=1)
+    card.pack(fill="both", expand=True, padx=18, pady=18)
 
-    input_box(window, "Nombre completo")
-    input_box(window, "RUT")
-    input_box(window, "Correo electrónico")
-    input_box(window, "Contraseña", hidden=True)
-    input_box(window, "Rol")
-    input_box(window, "Teléfono")
-    input_box(window, "Salario")
-    input_box(window, "Fecha de inicio")
-    input_box(window, "ID Departamento")
+    tk.Label(card, text="REGISTRAR EMPLEADO", bg=CARD_BG, fg=TEXT_COLOR,
+             font=("Segoe UI", 16, "bold")).pack(pady=18)
+
+    labels = ["Nombre completo", "RUT", "Correo electrónico", "Contraseña", "Rol", "Teléfono", "Salario", "Fecha de inicio", "ID Departamento"]
+    for label in labels:
+        tk.Label(card, text=label, bg=CARD_BG, fg=LABEL_COLOR, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=18, pady=(10, 0))
+        entry_bg = tk.Frame(card, bg=FIELD_BG)
+        entry_bg.pack(fill="x", padx=18, pady=6)
+        tk.Entry(entry_bg, bd=0, bg=FIELD_BG, fg=TEXT_COLOR, font=("Segoe UI", 11), show="*" if label == "Contraseña" else "").pack(fill="x", padx=12, pady=12)
 
     def guardar():
         messagebox.showinfo("Demo", "Empleado registrado en la interfaz demo.")
         window.destroy()
 
-    create_button(window, "Guardar empleado", guardar)
+    create_button(card, "Guardar empleado", guardar)
 
 
 def listar_empleados():
@@ -127,21 +188,29 @@ def eliminar_empleado():
 
 def registrar_departamento():
     window = tk.Toplevel(root)
-    window.configure(bg=BG)
+    window.configure(bg=ROOT_BG)
     window.title("Registrar departamento")
     window.geometry("420x360")
     window.resizable(False, False)
 
-    tk.Label(window, text="REGISTRAR DEPARTAMENTO", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
+    card = tk.Frame(window, bg=CARD_BG, bd=1, relief="solid", highlightbackground=CARD_BORDER,
+                    highlightcolor=CARD_BORDER, highlightthickness=1)
+    card.pack(fill="both", expand=True, padx=18, pady=18)
 
-    input_box(window, "Nombre del departamento")
-    input_box(window, "Gerente")
+    tk.Label(card, text="REGISTRAR DEPARTAMENTO", bg=CARD_BG, fg=TEXT_COLOR,
+             font=("Segoe UI", 16, "bold")).pack(pady=18)
+
+    for label in ["Nombre del departamento", "Gerente"]:
+        tk.Label(card, text=label, bg=CARD_BG, fg=LABEL_COLOR, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=18, pady=(10, 0))
+        entry_bg = tk.Frame(card, bg=FIELD_BG)
+        entry_bg.pack(fill="x", padx=18, pady=6)
+        tk.Entry(entry_bg, bd=0, bg=FIELD_BG, fg=TEXT_COLOR, font=("Segoe UI", 11)).pack(fill="x", padx=12, pady=12)
 
     def guardar():
         messagebox.showinfo("Demo", "Departamento registrado en la interfaz demo.")
         window.destroy()
 
-    create_button(window, "Guardar departamento", guardar)
+    create_button(card, "Guardar departamento", guardar)
 
 
 def listar_departamentos():
@@ -154,22 +223,29 @@ def listar_departamentos():
 
 def registrar_proyecto():
     window = tk.Toplevel(root)
-    window.configure(bg=BG)
+    window.configure(bg=ROOT_BG)
     window.title("Registrar proyecto")
     window.geometry("420x380")
     window.resizable(False, False)
 
-    tk.Label(window, text="REGISTRAR PROYECTO", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
+    card = tk.Frame(window, bg=CARD_BG, bd=1, relief="solid", highlightbackground=CARD_BORDER,
+                    highlightcolor=CARD_BORDER, highlightthickness=1)
+    card.pack(fill="both", expand=True, padx=18, pady=18)
 
-    input_box(window, "Nombre del proyecto")
-    input_box(window, "Descripción")
-    input_box(window, "Fecha de inicio")
+    tk.Label(card, text="REGISTRAR PROYECTO", bg=CARD_BG, fg=TEXT_COLOR,
+             font=("Segoe UI", 16, "bold")).pack(pady=18)
+
+    for label in ["Nombre del proyecto", "Descripción", "Fecha de inicio"]:
+        tk.Label(card, text=label, bg=CARD_BG, fg=LABEL_COLOR, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=18, pady=(10, 0))
+        entry_bg = tk.Frame(card, bg=FIELD_BG)
+        entry_bg.pack(fill="x", padx=18, pady=6)
+        tk.Entry(entry_bg, bd=0, bg=FIELD_BG, fg=TEXT_COLOR, font=("Segoe UI", 11)).pack(fill="x", padx=12, pady=12)
 
     def guardar():
         messagebox.showinfo("Demo", "Proyecto registrado en la interfaz demo.")
         window.destroy()
 
-    create_button(window, "Guardar proyecto", guardar)
+    create_button(card, "Guardar proyecto", guardar)
 
 
 def listar_proyectos():
@@ -182,34 +258,44 @@ def listar_proyectos():
 
 def menu_admin():
     window = tk.Toplevel(root)
-    window.configure(bg=BG)
+    window.configure(bg=ROOT_BG)
     window.title("Panel administrador")
     window.geometry("420x520")
     window.resizable(False, False)
 
-    tk.Label(window, text="PANEL ADMINISTRADOR", bg=BG, fg=FG, font=("Arial", 18)).pack(pady=16)
+    card = tk.Frame(window, bg=CARD_BG, bd=1, relief="solid", highlightbackground=CARD_BORDER,
+                    highlightcolor=CARD_BORDER, highlightthickness=1)
+    card.pack(fill="both", expand=True, padx=18, pady=18)
 
-    create_button(window, "Registrar empleado", registrar_empleado)
-    create_button(window, "Listar empleados", listar_empleados)
-    create_button(window, "Eliminar empleado", eliminar_empleado)
-    create_button(window, "Registrar departamento", registrar_departamento)
-    create_button(window, "Listar departamentos", listar_departamentos)
-    create_button(window, "Registrar proyecto", registrar_proyecto)
-    create_button(window, "Listar proyectos", listar_proyectos)
+    tk.Label(card, text="PANEL ADMINISTRADOR", bg=CARD_BG, fg=TEXT_COLOR,
+             font=("Segoe UI", 18, "bold")).pack(pady=16)
+
+    create_button(card, "Registrar empleado", registrar_empleado)
+    create_button(card, "Listar empleados", listar_empleados)
+    create_button(card, "Eliminar empleado", eliminar_empleado)
+    create_button(card, "Registrar departamento", registrar_departamento)
+    create_button(card, "Listar departamentos", listar_departamentos)
+    create_button(card, "Registrar proyecto", registrar_proyecto)
+    create_button(card, "Listar proyectos", listar_proyectos)
 
 
 def menu_empleado(name):
     window = tk.Toplevel(root)
-    window.configure(bg=BG)
+    window.configure(bg=ROOT_BG)
     window.title("Panel empleado")
     window.geometry("420x420")
     window.resizable(False, False)
 
-    tk.Label(window, text=f"BIENVENIDO {name}", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=16)
+    card = tk.Frame(window, bg=CARD_BG, bd=1, relief="solid", highlightbackground=CARD_BORDER,
+                    highlightcolor=CARD_BORDER, highlightthickness=1)
+    card.pack(fill="both", expand=True, padx=18, pady=18)
 
-    create_button(window, "Ver mis datos", lambda: ver_datos(name))
-    create_button(window, "Registrar tiempo", lambda: registrar_tiempo(name))
-    create_button(window, "Ver mis registros", lambda: ver_registros(name))
+    tk.Label(card, text=f"BIENVENIDO {name}", bg=CARD_BG, fg=TEXT_COLOR,
+             font=("Segoe UI", 16, "bold")).pack(pady=16)
+
+    create_button(card, "Ver mis datos", lambda: ver_datos(name))
+    create_button(card, "Registrar tiempo", lambda: registrar_tiempo(name))
+    create_button(card, "Ver mis registros", lambda: ver_registros(name))
 
 
 def ver_datos(name):
@@ -224,23 +310,29 @@ def ver_datos(name):
 
 def registrar_tiempo(name):
     window = tk.Toplevel(root)
-    window.configure(bg=BG)
+    window.configure(bg=ROOT_BG)
     window.title("Registrar tiempo")
     window.geometry("420x420")
     window.resizable(False, False)
 
-    tk.Label(window, text="REGISTRAR TIEMPO", bg=BG, fg=FG, font=("Arial", 16)).pack(pady=12)
+    card = tk.Frame(window, bg=CARD_BG, bd=1, relief="solid", highlightbackground=CARD_BORDER,
+                    highlightcolor=CARD_BORDER, highlightthickness=1)
+    card.pack(fill="both", expand=True, padx=18, pady=18)
 
-    input_box(window, "Fecha")
-    input_box(window, "Hora")
-    input_box(window, "Descripción")
-    input_box(window, "ID de proyecto")
+    tk.Label(card, text="REGISTRAR TIEMPO", bg=CARD_BG, fg=TEXT_COLOR,
+             font=("Segoe UI", 16, "bold")).pack(pady=18)
+
+    for label in ["Fecha", "Hora", "Descripción", "ID de proyecto"]:
+        tk.Label(card, text=label, bg=CARD_BG, fg=LABEL_COLOR, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=18, pady=(10, 0))
+        entry_bg = tk.Frame(card, bg=FIELD_BG)
+        entry_bg.pack(fill="x", padx=18, pady=6)
+        tk.Entry(entry_bg, bd=0, bg=FIELD_BG, fg=TEXT_COLOR, font=("Segoe UI", 11)).pack(fill="x", padx=12, pady=12)
 
     def guardar():
         messagebox.showinfo("Demo", "Registro de tiempo guardado en la interfaz demo.")
         window.destroy()
 
-    create_button(window, "Guardar registro", guardar)
+    create_button(card, "Guardar registro", guardar)
 
 
 def ver_registros(name):
@@ -251,42 +343,12 @@ def ver_registros(name):
     mostrar_lista("Mis registros", lines)
 
 
-def actualizar_estado_inicio():
-    status_label.config(text="Demo de interfaz: interactúa con las ventanas para ver el diseño.", fg="#99aab5")
-
-
 root = tk.Tk()
 root.title("Sistema Empresarial")
 root.geometry("520x580")
-root.configure(bg=BG)
+root.configure(bg=ROOT_BG)
 root.resizable(False, False)
 
-root_frame = tk.Frame(root, bg=BG)
-root_frame.pack(pady=25)
-
-logo_label = tk.Label(root_frame, text="SISTEMA EMPRESARIAL", bg=BG, fg=FG, font=("Arial", 22, "bold"))
-logo_label.pack(pady=10)
-
-subtitle_label = tk.Label(
-    root_frame,
-    text="Administra usuarios, departamentos, proyectos y tiempos desde una sola ventana.",
-    bg=BG,
-    fg="#b9bbbe",
-    wraplength=460,
-    justify="center"
-)
-subtitle_label.pack(pady=6)
-
-buttons_frame = tk.Frame(root, bg=BG)
-buttons_frame.pack(pady=12)
-
-create_button(buttons_frame, "Registrar administrador", registrar_admin)
-create_button(buttons_frame, "Iniciar sesión", login)
-create_button(buttons_frame, "Salir", root.quit)
-
-status_label = tk.Label(root, text="", bg=BG, fg="#99aab5", font=("Arial", 11))
-status_label.pack(pady=12)
-
-actualizar_estado_inicio()
+build_login_screen()
 
 root.mainloop()
